@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Site Summarizer
 
-## Getting Started
+A Next.js app that takes a website URL, scrapes the page, and uses Google Gemini to produce a short structured summary.
 
-First, run the development server:
+Built with TypeScript, Next.js (App Router), Node.js, `@google/genai`, `cheerio` and `undici`.
+
+## How it works
+
+1. The UI (`app/page.tsx`) posts `{ "url": "..." }` to `/api/summarize`.
+2. `lib/scrape.ts` validates the URL, fetches the HTML safely, and extracts the readable text.
+3. `lib/summarize.ts` sends that text to Gemini and returns the summary.
+4. The route (`app/api/summarize/route.ts`) maps failures to proper HTTP status codes and logs details server-side with a request ID.
+
+## Getting started
+
+Requirements: Node.js 20 or later and a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
+
+```bash
+git clone <your-repo-url>
+cd site-summarizer
+npm install
+```
+
+Create `.env.local` in the project root:
+
+```
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+`GEMINI_MODEL` is optional and defaults to `gemini-2.5-flash`.
+
+Run the dev server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`POST /api/summarize`
 
-## Learn More
+Request:
 
-To learn more about Next.js, take a look at the following resources:
+```json
+{"url": "https://example.com"}
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Success (200):
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```json
+{
+  "title": "Example Domain",
+  "url": "https://example.com/",
+  "summary": "...",
+  "requestId": "..."
+}
+```
 
-## Deploy on Vercel
+Errors return `{ "error": "message", "requestId": "..." }` with these statuses:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Status | Meaning                                                    |
+| ------ | ---------------------------------------------------------- |
+| 400    | Invalid JSON, missing or invalid URL, or a blocked address |
+| 422    | The page was not HTML or had no readable text              |
+| 500    | Server misconfiguration or unexpected error                |
+| 502    | The target site or Gemini failed                           |
+| 503    | Gemini is rate limiting, try again shortly                 |
+| 504    | The target site or Gemini timed out                        |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Try it:
+
+```bash
+curl -X POST http://localhost:3000/api/summarize \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com"}'
+```
+
+## Project structure
+
+```
+app/
+  api/summarize/route.ts   API route, validation and error mapping
+  page.tsx                 Client UI
+lib/
+  scrape.ts                Safe fetching and text extraction
+  summarize.ts             Gemini client, timeout and retry
+```
