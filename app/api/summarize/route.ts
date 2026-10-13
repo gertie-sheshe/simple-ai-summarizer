@@ -2,8 +2,6 @@ import {NextResponse} from "next/server";
 import {scrapePage} from "@/lib/scrape";
 import {summarizePage} from "@/lib/summarize";
 
-// export const runtime = "nodejs";
-
 export async function POST(req: Request) {
   let body: unknown;
   try {
